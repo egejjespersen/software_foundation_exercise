@@ -169,3 +169,13 @@ Proof.
   simpl.
   apply IHn.
 Qed.
+
+Fixpoint ble_nat (n m : nat) : bool :=
+  match n with
+  | O => true
+  | S n' =>
+      match m with
+      | O => false
+      | S m' => ble_nat n' m'
+      end
+  end.
