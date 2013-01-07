@@ -420,8 +420,7 @@ Inductive next_even (n:nat) : nat -> Prop :=
   | ne_2 : ev (S (S n)) -> next_even n (S (S n)).
 
 Inductive total_relation : nat -> nat -> Prop :=
-  | tl_1 : forall (n:nat) (m:nat), total_relation (S n) m
-  | tl_2 : forall (n:nat) (m:nat), total_relation n (S m).
+  | tl : forall (n:nat) (m:nat), total_relation n m.
 
 
 Inductive all (X : Type) (P : X -> Prop) : list X -> Prop :=
