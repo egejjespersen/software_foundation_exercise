@@ -324,6 +324,11 @@ Inductive bexp : Type :=
 | BNot : bexp -> bexp
 | BAnd : bexp -> bexp -> bexp.
 
+Tactic Notation "bexp_cases" tactic(first) ident(c) :=
+  first;
+  [ Case_aux c "BTrue" | Case_aux c "BFalse" | Case_aux c "BEq"
+  | Case_aux c "BLe" | Case_aux c "BNot" | Case_aux c "BAnd" ].
+
 Fixpoint aeval (st : state) (e : aexp) : nat :=
   match e with
     | ANum n       => n

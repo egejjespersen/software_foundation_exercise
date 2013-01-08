@@ -204,8 +204,18 @@ Theorem skip_right: forall c,
     (c; SKIP)
     c.
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  intros c.
+  split; intros H.
+  Case "->".
+    inversion H. subst.
+    inversion H5. subst.
+    assumption.
+
+  Case "<-".
+    apply E_Seq with st'.
+    apply H.
+    apply E_Skip.
+Qed.
 
 (** Similarly, here is a simple transformations that simplifies [IFB]
     commands: *)
@@ -290,8 +300,36 @@ Theorem IFB_false: forall b c1 c2,
     (IFB b THEN c1 ELSE c2 FI)
     c2.
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  intros b c1 c2 Hb.
+  split; intros H.
+  Case "->".
+    inversion H; subst.
+    SCase "true".
+      unfold bequiv in Hb.
+      simpl in Hb.
+      rewrite Hb in H5.
+      inversion H5.
+    SCase "False".
+      assumption.
+  Case "<-".
+    apply E_IfFalse.
+    apply Hb.
+    assumption.
+Qed.
+
+Require Export Relations.
+
+Theorem cequiv_trans :
+  transitive com cequiv.
+Proof.
+  unfold transitive.
+  intros.
+  unfold cequiv.
+  intros.
+  split; intros.
+  apply H0. apply H. apply H1.
+  apply H. apply H0. apply H1.
+Qed.
 
 (** **** Exercise: 3 stars (swap_if_branches) *)
 Theorem swap_if_branches: forall b e1 e2,
@@ -299,8 +337,30 @@ Theorem swap_if_branches: forall b e1 e2,
     (IFB b THEN e1 ELSE e2 FI)
     (IFB BNot b THEN e2 ELSE e1 FI).
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  intros.
+  split; intros.
+  Case "->".
+  inversion H;
+    subst;
+    [apply E_IfFalse; simpl; try apply negb_false_iff |
+     apply E_IfTrue;  simpl; try apply negb_true_iff];
+    assumption.
+
+  Case "<-".
+  inversion H;
+    subst.
+  apply E_IfFalse.
+  simpl in H5.
+  apply negb_true_iff in H5.
+  assumption.
+  assumption.
+
+  apply E_IfTrue.
+  simpl in H5.
+  apply negb_false_iff in H5.
+  assumption.
+  assumption.
+Qed.
 
 (** For [WHILE] loops, we can give a similar pair of theorems.  A loop
     whose guard is equivalent to [BFalse] is equivalent to [SKIP],
@@ -326,13 +386,6 @@ Proof.
     apply E_WhileEnd.
     rewrite Hb.
     reflexivity.  Qed.
-
-(** **** Exercise: 2 stars (WHILE_false_informal) *)
-(** Write an informal proof of [WHILE_false].
-
-(* FILL IN HERE *)
-[]
-*)
 
 (** To prove the second fact, we need an auxiliary lemma stating that
     [WHILE] loops whose guards are equivalent to [BTrue] never
@@ -378,13 +431,6 @@ unfold bequiv in Hb.
   Case "E_WhileLoop". (* immediate from the IH *)
     apply IHceval2. reflexivity.  Qed.
 
-(** **** Exercise: 2 stars, optional (WHILE_true_nonterm_informal) *)
-(** Explain what the lemma [WHILE_true_nonterm] means in English.
-
-(* FILL IN HERE *)
-*)
-(** [] *)
-
 (** **** Exercise: 2 stars, recommended (WHILE_true) *)
 (** Hint: You'll want to use [WHILE_true_nonterm] here. *)
 
@@ -394,8 +440,18 @@ Theorem WHILE_true: forall b c,
        (WHILE b DO c END)
        (WHILE BTrue DO SKIP END).
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  intros.
+  split; intros.
+  apply WHILE_true_nonterm in H0 ;
+    [apply ex_falso_quodlibet; assumption
+     | assumption].
+  apply WHILE_true_nonterm in H0.
+  apply ex_falso_quodlibet.
+  assumption.
+  unfold bequiv.
+  simpl.
+  reflexivity.
+Qed.
 
 Theorem loop_unrolling: forall b c,
   cequiv
@@ -429,30 +485,6 @@ Proof.
 (** [] *)
 
 (** ** The Functional Equivalence Axiom *)
-
-(** Finally, let's look at simple equivalences involving assignments.
-    For example, we might expect to be able to show that [X ::= AId X]
-    is equivalent to [SKIP].  However, when we try to show it, we get
-    stuck in an interesting way. *)
-
-Theorem identity_assignment_first_try : forall (X:id),
-  cequiv (X ::= AId X) SKIP.
-Proof.
-   intros. split; intro H.
-     Case "->".
-       inversion H; subst.  simpl.
-       replace (update st X (st X)) with st.
-       constructor.
-       (* Here we're stuck. The goal looks reasonable,
-          but in fact it is not provable!  If we look back
-          at the set of lemmas we proved about [update] in
-          the last chapter, we can see that lemma
-          [update_same] almost does the job, but not quite:
-          it says that the original and updated states
-          agree at all values, but this is not the same
-          thing as saying that they are [=] in Coq's
-          sense! *)
-Admitted.
 
 (** What is going on here?  Recall that our states are just
     functions from identifiers to values.  For Coq, functions are only
@@ -523,8 +555,28 @@ Theorem assign_aequiv : forall X e,
   aequiv (AId X) e ->
   cequiv SKIP (X ::= e).
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  intros.
+  split; intros; inversion H0; subst.
+  Case "->".
+    assert (st' = update st' X (aeval st' e)).
+      apply functional_extensionality.
+      intro.
+      rewrite update_same.
+      reflexivity.
+      apply H.
+    rewrite -> H1 at 2.
+    eapply E_Ass.
+    reflexivity.
+  Case "<-".
+    assert (st = update st X (aeval st e)).
+      apply functional_extensionality.
+      intro.
+      rewrite update_same.
+      reflexivity.
+      apply H.
+    rewrite <- H1.
+    constructor.
+Qed.
 
 (** **** Exercise: 2 stars, optional (functional_extensionality_failed_false) *)
 
@@ -745,16 +797,62 @@ Theorem CSeq_congruence : forall c1 c1' c2 c2',
   cequiv c1 c1' -> cequiv c2 c2' ->
   cequiv (c1;c2) (c1';c2').
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  unfold cequiv.
+  intros.
+  split; intros H1.
+  Case "->".
+    inversion H1; subst.
+    apply E_Seq with st'0.
+    apply H.
+    assumption.
+    apply H0.
+    assumption.
+  Case "<-".
+    inversion H1; subst.
+    apply E_Seq with st'0.
+    apply H.
+    assumption.
+    apply H0.
+    assumption.
+Qed.
 
 (** **** Exercise: 3 stars (CIf_congruence) *)
 Theorem CIf_congruence : forall b b' c1 c1' c2 c2',
   bequiv b b' -> cequiv c1 c1' -> cequiv c2 c2' ->
   cequiv (IFB b THEN c1 ELSE c2 FI) (IFB b' THEN c1' ELSE c2' FI).
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  unfold bequiv, cequiv.
+  intros.
+  split; intros.
+  Case "->".
+    inversion H2; subst.
+    SCase "True".
+      apply E_IfTrue.
+      rewrite <- H.
+      assumption.
+      apply H0.
+      assumption.
+    SCase "False".
+      apply E_IfFalse.
+      rewrite <- H.
+      assumption.
+      apply H1.
+      assumption.
+  Case "<-".
+    inversion H2; subst.
+    SCase "True".
+      apply E_IfTrue.
+      rewrite H.
+      assumption.
+      apply H0.
+      assumption.
+    SCase "False".
+      apply E_IfFalse.
+      rewrite H.
+      assumption.
+      apply H1.
+      assumption.
+Qed.
 
 (** For example, here are two equivalent programs and a proof of their
     equivalence... *)
@@ -1086,7 +1184,15 @@ Proof.
          become constants after folding *)
       simpl. destruct (beq_nat n n0); reflexivity.
   Case "BLe".
-    (* FILL IN HERE *) admit.
+    rename a into a1. rename a0 into a2. simpl.
+    remember (fold_constants_aexp a1) as a1'.
+    remember (fold_constants_aexp a2) as a2'.
+    replace (aeval st a1) with (aeval st a1') by
+        (subst a1'; rewrite <- fold_constants_aexp_sound; reflexivity).
+    replace (aeval st a2) with (aeval st a2') by
+        (subst a2'; rewrite <- fold_constants_aexp_sound; reflexivity).
+    destruct a1'; destruct a2'; try reflexivity.
+    simpl. destruct (ble_nat n n0); reflexivity.
   Case "BNot".
     simpl. remember (fold_constants_bexp b) as b'.
     rewrite IHb.
@@ -1125,8 +1231,18 @@ Proof.
       apply trans_cequiv with c2; try assumption.
       apply IFB_false; assumption.
   Case "WHILE".
-    (* FILL IN HERE *) Admitted.
-(** [] *)
+    assert (bequiv b (fold_constants_bexp b)).
+      SCase "Pf of assertion". apply fold_constants_bexp_sound.
+    remember (fold_constants_bexp b) as b'.
+    destruct b';
+      try (apply CWhile_congruence; assumption).
+    SCase "b alwas true".
+      apply WHILE_true.
+      assumption.
+    SCase "b alwas false".
+      apply WHILE_false.
+      assumption.
+Qed.
 
 (* ########################################################## *)
 (** *** Soundness of (0 + n) Elimination, Redux *)
@@ -1320,8 +1436,12 @@ Proof.
 Theorem inequiv_exercise:
   ~ cequiv (WHILE BTrue DO SKIP END) SKIP.
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  intros contra.
+  eapply loop_never_stops with empty_state empty_state.
+  unfold loop.
+  apply contra.
+  apply E_Skip.
+Qed.
 
 (** * Extended exercise: Non-deterministic Imp *)
 
