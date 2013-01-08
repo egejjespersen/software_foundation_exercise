@@ -724,6 +724,7 @@ Fixpoint s_compile (e : aexp) : list sinstr :=
     | AMult a1 a2  => s_compile a1 ++ s_compile a2 ++ [SMult]
   end.
 
+(* not used *)
 Theorem s_execute_step :
   forall (st : state) (inst : sinstr) (prog : list sinstr) (l l' l'': list nat),
     s_eval st l inst = l' ->
@@ -740,6 +741,7 @@ Proof.
       try destruct l; rewrite H; assumption.
 Qed.
 
+(* not used *)
 Theorem s_execute_step_last :
   forall (st : state) (inst : sinstr) (prog : list sinstr) (l l' l'': list nat),
     s_execute st l prog = l' ->
