@@ -472,10 +472,17 @@ Lemma step_example3 :
        (tapp (tapp idBBBB idBB) idB)
   ==>* idB.
 Proof.
-  (* FILL IN HERE *) Admitted.
-
-(* FILL IN HERE *)
-(** [] *)
+  eapply multi_step.
+    apply ST_App1.
+    apply ST_AppAbs.
+    auto.
+  simpl.
+  eapply multi_step.
+    apply ST_AppAbs.
+    auto.
+    simpl.
+  apply multi_refl.
+Qed.
 
 (* ###################################################################### *)
 (** ** Typing *)
@@ -653,8 +660,17 @@ Example typing_example_3 :
       T.
 
 Proof with auto.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  eapply ex_intro.
+  repeat constructor.
+  econstructor.
+  constructor.
+  rewrite extend_neq.
+  apply extend_eq.
+  auto.
+  econstructor...
+  repeat constructor.
+  repeat constructor.
+Qed.
 
 (** We can also show that terms are _not_ typable.  For example, let's
     formally check that there is no typing derivation assigning a type
@@ -695,8 +711,32 @@ Example typing_nonexample_3 :
              (tapp (tvar x) (tvar x)))
           T).
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  intros Hc. inversion Hc.
+  inversion H. subst. clear H.
+  inversion H0. subst. clear H0.
+  inversion H5. subst. clear H5.
+  inversion H2. subst. clear H2.
+  inversion H4. subst. clear H4.
+  rewrite H1 in H2.
+  inversion H2.
+  assert (~ exists T T', TArrow T T' = T).
+    intros Hc'.
+    inversion Hc'.
+    induction x1; intros.
+    Case "TBool".
+      inversion H.
+      inversion H3.
+    Case "TArrow".
+      inversion H.
+      eapply IHx1_1.
+      inversion H3.
+      eapply ex_intro.
+      apply H3.
+
+  apply H.
+  exists T11, T12.
+  apply H0.
+Qed.
 
 (** **** Exercise: 1 star, optional (typing_statements) *)
 
@@ -838,8 +878,55 @@ Theorem progress' : forall t T,
 Proof.
   intros t.
   t_cases (induction t) Case; intros T Ht; auto.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  Case "tvar".
+    inversion Ht; subst.
+    inversion H1.
+  Case "tapp".
+    right.
+    destruct t1; try (solve by inversion 3).
+
+    inversion Ht.
+    assert (value (tapp t1_1 t1_2) \/ (exists t' : tm, tapp t1_1 t1_2 ==> t')).
+      eapply IHt1.
+      apply H2.
+    inversion H5.
+    inversion H6.
+    inversion H6.
+
+    eapply ex_intro.
+    constructor.
+    apply H7.
+
+    inversion Ht; subst.
+    assert (value t2 \/ (exists t' : tm, t2 ==> t')).
+      eapply IHt2.
+      eassumption.
+
+    inversion H.
+      eapply ex_intro. auto.
+      inversion H0.
+      eapply ex_intro. apply ST_App2; eauto.
+
+    inversion Ht; subst.
+    assert (value (tif t1_1 t1_2 t1_3) \/ (exists t' : tm, tif t1_1 t1_2 t1_3 ==> t')).
+      eapply IHt1.
+      apply H2.
+    inversion H.
+    inversion H0.
+    inversion H0.
+    eapply ex_intro. eauto.
+  Case "tif".
+    right.
+    inversion Ht; subst.
+    assert (value t1 \/ (exists t' : tm, t1 ==> t')).
+      eapply IHt1.
+      apply H3.
+    inversion H.
+      inversion H0; subst; eauto.
+      inversion H3.
+    inversion H0.
+    eauto.
+Qed.
 
 (* ###################################################################### *)
 (** *** Free Occurrences *)
@@ -948,8 +1035,17 @@ Corollary typable_empty__closed : forall t T,
     has_type empty t T  ->
     closed t.
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  intros t T H x H1.
+  remember (@empty ty) as Gamma.
+  assert (exists t' : _, Gamma x = Some t').
+    apply free_in_context with (t := t) (T := T).
+    assumption.
+    assumption.
+
+  inversion H0.
+  rewrite HeqGamma in H2.
+  inversion H2.
+Qed.
 
 (** Sometimes, when we have a proof [Gamma |- t : T], we will need to
     replace [Gamma] by a different context [Gamma'].  When is it safe
@@ -1243,7 +1339,23 @@ Proof.
   intros t t' T Hhas_type Hmulti. unfold stuck.
   intros [Hnf Hnot_val]. unfold normal_form in Hnf.
   induction Hmulti.
-  (* FILL IN HERE *) Admitted.
+  assert (value x0 \/ exists t' : tm, x0 ==> t').
+    eapply progress.
+    eauto.
+  inversion Hhas_type; subst; auto; try (solve by inversion).
+  Case "tapp".
+    apply Hnf.
+    inversion H.
+    inversion H2.
+    apply H2.
+  Case "tif".
+    apply Hnf.
+    inversion H; [solve by inversion | auto].
+
+  (* step *)
+  apply IHHmulti; auto.
+  eapply preservation; eauto.
+Qed.
 
 (* ###################################################################### *)
 (** *** Uniqueness of Types *)
@@ -1254,8 +1366,36 @@ Proof.
     type. *)
 (** Formalize this statement and prove it. *)
 
-(* FILL IN HERE *)
-(** [] *)
+Theorem types_unique :
+  forall t Gamma T1 T2,
+    has_type Gamma t T1 ->
+    has_type Gamma t T2 ->
+    T1 = T2.
+Proof.
+  induction t;
+    intros;
+    inversion H;
+    inversion H0;
+    subst.
+  rewrite H3 in H7.
+  inversion H7. auto.
+
+  assert ((TArrow T11 T1) = (TArrow T0 T2)).
+  eapply IHt1; eauto.
+  inversion H1. auto.
+
+  inversion H; try (solve by inversion); subst.
+  inversion H0; try (solve by inversion); subst.
+  f_equal.
+  eapply IHt; eauto.
+
+  reflexivity.
+  reflexivity.
+
+  eapply IHt2.
+  eauto.
+  eauto.
+Qed.
 
 (* ###################################################################### *)
 (** ** Additional Exercises *)
