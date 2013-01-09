@@ -443,8 +443,12 @@ Hint Unfold stuck.
 Example some_term_is_stuck :
   exists t, stuck t.
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  exists (tsucc ttrue).
+  unfold stuck, normal_form, value.
+  split; unfold not; intros.
+  solve by inversion 3.
+  solve by inversion 3.
+Qed.
 
 (** However, although values and normal forms are not the same in this
     language, the former set is included in the latter.  This is
@@ -463,18 +467,79 @@ Proof.
 Lemma value_is_nf : forall t,
   value t -> step_normal_form t.
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  intros.
+  unfold normal_form, not.
+  intros.
+  inversion H0.
+  inversion H.
+  inversion H2.
+  subst.
+  inversion H1.
+  subst.
+  inversion H1.
+  assert (forall t, nvalue t -> ~ (exists t', t ==> t')).
+    unfold not.
+    intros.
+    induction H3.
+    solve by inversion 2.
+    apply IHnvalue.
+    inversion H4.
+    inversion H5.
+    exists t1'.
+    assumption.
+  apply H3 in H0.
+  assumption.
+  assumption.
+Qed.
 
 (** **** Exercise: 3 stars, optional (step_deterministic) *)
 (** Using [value_is_nf], we can show that the [step] relation is
     also deterministic... *)
 
+Lemma prev_nvalue :
+  forall t,
+    nvalue (tsucc t) -> nvalue t.
+Proof.
+  intros.
+  inversion H.
+  apply H1.
+Qed.
+
 Theorem step_deterministic:
   deterministic step.
 Proof with eauto.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  unfold deterministic.
+  intros x y1 y2 Hy1 Hy2.
+  generalize dependent y2.
+  step_cases (induction Hy1) Case; subst; intros.
+  Case "ST_IfTrue".
+    inversion Hy2; try reflexivity.
+    solve by inversion.
+  Case "ST_IfFalse".
+    inversion Hy2; try reflexivity.
+    solve by inversion.
+  Case "ST_If".
+    inversion Hy2; subst; try solve by inversion.
+    f_equal.
+    auto.
+  Case "ST_Succ".
+    inversion Hy2; subst.
+    f_equal.
+    auto.
+  Case "ST_PredZero".
+    inversion Hy2.
+    reflexivity.
+    solve by inversion.
+  Case "ST_PredSucc".
+    generalize dependent y2.
+    induction t1; intros; try (inversion Hy2; solve by inversion).
+    inversion Hy2...
+    solve by inversion 2.
+    induction y2; try (solve by inversion 2).
+    f_equal.
+    apply IHt1.
+    apply prev_nvalue...
+    Admitted.
 
 (* ###################################################################### *)
 (** ** Typing *)
@@ -584,8 +649,10 @@ Example succ_hastype_nat__hastype_nat : forall t,
   has_type (tsucc t) TNat ->
   has_type t TNat.
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  intros.
+  inversion H.
+  apply H1.
+Qed.
 
 (* ###################################################################### *)
 (** ** Progress *)
@@ -645,8 +712,41 @@ Proof with auto.
     SCase "t1 can take a step".
       inversion H as [t1' H1].
       exists (tif t1' t2 t3)...
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  Case "T_Succ".
+    inversion IHHT.
+    left.
+      unfold value.
+      right.
+      inversion H.
+      inversion H0; subst; solve by inversion.
+      constructor...
+    right.
+      inversion H.
+      exists (tsucc x)...
+  Case "T_Pred".
+    inversion IHHT.
+    right.
+      inversion H.
+      inversion H0; subst; solve by inversion.
+      inversion H0.
+      exists (tzero)...
+      exists (t)...
+    right.
+      inversion H.
+      exists (tpred x)...
+  Case "T_Iszero".
+    inversion IHHT.
+    right.
+      inversion H.
+      inversion H0; subst; solve by inversion.
+      inversion H0.
+      exists (ttrue)...
+      exists (tfalse)...
+    right.
+      inversion H.
+      exists (tiszero x)...
+Qed.
+
 
 (** This is more interesting than the strong progress theorem that we
     saw in the Smallstep chapter, where _all_ normal forms were
@@ -729,8 +829,20 @@ Proof with auto.
       SCase "ST_IfFalse". assumption.
       SCase "ST_If". apply T_If; try assumption.
         apply IHHT1; assumption.
-    (* FILL IN HERE *) Admitted.
-(** [] *)
+    Case "T_Succ".
+      inversion HE; subst...
+    Case "T_Pred".
+      inversion HE; subst...
+      assert (forall t, nvalue t -> has_type t TNat).
+        intros.
+        induction H.
+        constructor.
+        constructor.
+        apply IHnvalue.
+      apply H...
+    Case "T_Iszero".
+      inversion HE; subst...
+Qed.
 
 (** **** Exercise: 3 stars (preservation_alternate_proof) *)
 (** Now prove the same property again by induction on the
@@ -778,9 +890,11 @@ Proof.
     not, give a counter-example.  (You do not need to prove your
     counter-example in Coq, but feel free to do so if you like.)
 
-    (* FILL IN HERE *)
-[]
 *)
+
+Definition subject_expnsion_counter_exmple :=
+  tif ttrue ttrue tzero.
+
 
 (** **** Exercise: 2 stars (variation1) *)
 (** Suppose we add the following two new rules to the reduction
